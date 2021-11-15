@@ -1,0 +1,128 @@
+---
+title: "ESM 206 Lab 8"
+author: "Michelle Geldin"
+date: "11/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(corrplot)
+library(stargazer)
+library(broom)
+library(modelsummary)
+library(here)
+```
+
+
+## Read in data
+
+```{r}
+homes <- read_csv(here("slo_homes.csv"))
+```
+
+A little bit of cleaning:
+
+Make a subset called homes_sub that only contains observations (rows) where the city is:
+
+- San Luis Obispo
+- Arroyo Grande
+- Atascadero
+- Santa Maria-Orcutt
+
+```{r}
+homes_sub <- homes %>%
+  filter(City %in% c("San Luis Obispo", "Arroyo Grande", "Atascadero", "Santa Maria-Orcutt")) # This will look for each item in sequential order if you don't use %in% so use %in%!
+  
+```
+
+## Do a little exploring of our data
+
+Summary statistics (home price, based on city and sale status)
+
+- Find and return in a nice summary table the mean and standard deviation of home price. grouped by city and sale status.
+```{r, include = FALSE, eval = FALSE}
+homes_sub %>%
+  group_by(City, Status) %>%
+  summarize(mean_price = mean(Price, na.rm = TRUE),
+            sd_price = sd(Price, na.rm = TRUE))
+
+# If I don't even want to run this code, add eval equals false in the top code. This will skip over to the next piece.
+
+ggplot(data = homes_sub, aes(x = Price)) +
+  geom_density(aes(color = City, fill = City), alpha = 0.3) + #alpha has to do with the level of opaqueness of the fill colors.
+  scale_x_continuous(limits = c(0, 3e6))#o.3 is not assigned to a variable, it's assigned to a constant so we put it outside the parentheses? # Scale x continuous can change variable on the x axis only if it's a continuous variable. If it wasn't you can use scale x discrete or something. 
+                     
+```
+Explore the relationship (visual data exploration) between square footage and home price. Change the point COLOR by City, and the point shape by sale status.
+
+```{r}
+ggplot(data = homes_sub, aes(x = SqFt, y = Price)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+  
+```
+## Model the relationship with home price as the Dependant Variable (or outcome variable or DV)
+
+```{r}
+homes_lm_1 <- lm(Price ~City + Bedrooms + Bathrooms + SqFt + PricePerSqFt + Status, data = homes_sub) #Price is dependent variable here
+
+# Make a subset that only contains the quantitative variables
+homes_quant <- homes_sub %>%
+  select(Price:PricePerSqFt)
+
+homes_cor <- cor(homes_quant)
+homes_cor
+
+corrplot(homes_cor, method = "square")
+
+# How would I explore diagnostic plots?
+plot(homes_lm_1)
+```
+
+
+Try another model (homes_lm_2) where we simplify this a bit
+
+- City
+- SqFt
+- Status
+
+```{r}
+homes_lm_2 <- lm(Price ~ City + SqFt + Status, data = homes_sub)
+homes_lm_2
+
+plot(homes_lm_2)
+```
+Find the AIC value of each model:
+
+```{r}
+AIC(homes_lm_1)
+AIC(homes_lm_2)
+```
+Lower AIC values indicate a better balance between model fit and complexity. Maybe neither are the models were looking for. Maybe we need a better intermediate model.
+
+Try another permutation of this model that you think might make sense. Check out and compare the model fit, outputs, and AIC value.
+
+```{r}
+homes_lm_3 <- lm(Price ~ City + SqFt + Status + Bedrooms, data = homes_sub)
+
+summary(homes_lm_3)
+AIC(homes_lm_3)
+  
+```
+Use `modelsummary` to show model outputs side-by-side:
+
+```{r}
+modelsummary(list(homes_lm_1, homes_lm_2, homes_lm_3))
+```
+
+## Start making predictions with this model
+
+Use `broom::augment()`
+
+```{r}
+homes_predicted <- augment(homes_lm_1)
+```
+
+Use the `predict()` function to try out your model on new scenarios that you create.
